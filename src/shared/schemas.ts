@@ -58,9 +58,12 @@ export const CandidateProfileSummarySchema = z.object({
 });
 
 export const GeminiSettingsSchema = z.object({
+  provider: z.enum(["gemini", "openai"]).default("gemini"),
   apiKey: z.string().default(""),
   primaryModel: z.string().default("gemini-2.5-flash-lite"),
   fallbackModel: z.string().default("gemini-2.5-flash"),
+  openaiApiKey: z.string().default(""),
+  openaiModel: z.string().default("gpt-4o-mini"),
   mockMode: z.boolean().default(false),
 });
 

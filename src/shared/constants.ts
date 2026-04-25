@@ -12,6 +12,9 @@ export const APP_NAME = "Opportunity Analyzer Agent";
 export const DEFAULT_PRIMARY_MODEL = "gemini-2.5-flash-lite";
 export const DEFAULT_FALLBACK_MODEL = "gemini-2.5-flash";
 
+/** Default OpenAI model. */
+export const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
+
 /**
  * Conservative default budget. Free-tier quotas fluctuate and are not
  * guaranteed, so we start well below common published caps and let the

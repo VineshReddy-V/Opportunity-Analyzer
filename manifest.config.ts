@@ -13,7 +13,7 @@ export default defineManifest({
   name: "Opportunity Analyzer Agent",
   version: "0.1.0",
   description:
-    "Local-first, rate-limit-aware opportunity analyzer powered by the free Google Gemini API.",
+    "Local-first, rate-limit-aware opportunity analyzer powered by Google Gemini or OpenAI.",
   action: {
     default_title: "Opportunity Analyzer Agent",
   },
@@ -48,6 +48,7 @@ export default defineManifest({
   ],
   host_permissions: [
     "https://generativelanguage.googleapis.com/*",
+    "https://api.openai.com/*",
   ],
   // Icons intentionally omitted; the extension runs without them.
   // Drop square PNGs into /icons and re-add this block to customize.

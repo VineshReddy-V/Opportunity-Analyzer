@@ -26,11 +26,19 @@ export type AgentMode = "normal" | "minimal";
 
 export type BudgetHealth = "healthy" | "constrained" | "exhausted";
 
+export type LlmProvider = "gemini" | "openai";
+
 export interface GeminiSettings {
-  /** Plain-text API key stored only in chrome.storage.local. */
+  /** Which LLM backend to use for analysis and generation. */
+  provider: LlmProvider;
+  /** Plain-text Gemini API key stored only in chrome.storage.local. */
   apiKey: string;
   primaryModel: string;
   fallbackModel: string;
+  /** Plain-text OpenAI API key stored only in chrome.storage.local. */
+  openaiApiKey: string;
+  /** OpenAI model to use (e.g. "gpt-4o-mini"). */
+  openaiModel: string;
   /** If true, do not call the network; return canned responses. Dev only. */
   mockMode: boolean;
 }

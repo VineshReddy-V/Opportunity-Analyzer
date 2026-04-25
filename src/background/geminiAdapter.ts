@@ -26,6 +26,8 @@ const log = createLogger("gemini");
 const GEMINI_BASE =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
+const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
+
 export interface GeminiCallArgs {
   /** Fully-composed prompt text. */
   prompt: string;
@@ -86,9 +88,12 @@ function extractRetryDelaySeconds(body: any): number | undefined {
 
 export class GeminiAdapter {
   private settings: GeminiSettings = {
+    provider: "gemini",
     apiKey: "",
     primaryModel: "gemini-2.5-flash-lite",
     fallbackModel: "gemini-2.5-flash",
+    openaiApiKey: "",
+    openaiModel: "gpt-4o-mini",
     mockMode: false,
   };
 
@@ -114,6 +119,15 @@ export class GeminiAdapter {
         candidatesTokens: estimateTokens(mockText),
         mode: "mock",
       };
+    }
+
+    if (this.settings.provider === "openai") {
+      if (!this.settings.openaiApiKey) {
+        throw new Error(
+          "OpenAI API key is not set. Open Settings and paste your key.",
+        );
+      }
+      return this.callOpenAI(args);
     }
 
     if (!this.settings.apiKey) {
@@ -263,6 +277,111 @@ export class GeminiAdapter {
         return this.callInternal(args, model, attempt + 1, allowFallback);
       }
       throw new Error(`Gemini call failed: ${sanitizeError(err)}`);
+    }
+  }
+
+  /**
+   * Call OpenAI chat completions API.
+   */
+  private async callOpenAI(args: GeminiCallArgs): Promise<GeminiCallResult> {
+    const model = this.settings.openaiModel || "gpt-4o-mini";
+    const estTokens =
+      estimateTokens(args.prompt) + (args.maxOutputTokens ?? 400);
+
+    // Budget gate (same as Gemini path).
+    for (let gate = 0; gate < 8; gate += 1) {
+      const decision = await budgetManager.shouldAllowCall(estTokens);
+      if (decision.kind === "allow") break;
+      if (decision.kind === "reject") {
+        throw new Error(decision.reason);
+      }
+      if (decision.kind === "downgrade") {
+        await addBudgetEvent({
+          timestamp: Date.now(),
+          kind: "decision",
+          detail: decision.reason,
+          mode: decision.mode,
+        });
+        break;
+      }
+      if (decision.kind === "delay") {
+        log.info("budget delay", decision.delayMs, decision.reason);
+        await sleep(decision.delayMs);
+      }
+    }
+
+    budgetManager.onRequestStart(estTokens);
+
+    const body = {
+      model,
+      messages: [
+        {
+          role: "user",
+          content: args.prompt,
+        },
+      ],
+      temperature: args.temperature ?? 0.2,
+      max_tokens: args.maxOutputTokens ?? 600,
+      response_format: { type: "json_object" as const },
+    };
+
+    try {
+      const res = await fetch(OPENAI_BASE, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.settings.openaiApiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (res.status === 429 || res.status === 503) {
+        budgetManager.onRequestEnd();
+        const backoff = await budgetManager.onRateLimit(0);
+        await sleep(backoff);
+        throw new Error(
+          `OpenAI rate limited (HTTP ${res.status}). Try again shortly.`,
+        );
+      }
+
+      if (!res.ok) {
+        let bodyText = "";
+        try {
+          bodyText = await res.text();
+        } catch {
+          /* ignore */
+        }
+        budgetManager.onRequestEnd();
+        await addBudgetEvent({
+          timestamp: Date.now(),
+          kind: "call_err",
+          detail: `OpenAI HTTP ${res.status}: ${bodyText.slice(0, 200)}`,
+        });
+        throw new Error(
+          `OpenAI HTTP ${res.status}: ${sanitizeError(bodyText)}`,
+        );
+      }
+
+      const json = await res.json();
+      budgetManager.onRequestEnd();
+      const text = json?.choices?.[0]?.message?.content?.trim() ?? "";
+      const promptTokens = json?.usage?.prompt_tokens ?? estimateTokens(args.prompt);
+      const candidatesTokens = json?.usage?.completion_tokens ?? estimateTokens(text);
+      await addBudgetEvent({
+        timestamp: Date.now(),
+        kind: "call_ok",
+        detail: `${args.callLabel} via openai/${model} ok (${promptTokens}p/${candidatesTokens}c)`,
+      });
+      return {
+        text,
+        model: `openai/${model}`,
+        promptTokens,
+        candidatesTokens,
+        mode: "live",
+      };
+    } catch (err) {
+      budgetManager.onRequestEnd();
+      throw new Error(`OpenAI call failed: ${sanitizeError(err)}`);
     }
   }
 

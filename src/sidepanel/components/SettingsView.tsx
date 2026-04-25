@@ -6,11 +6,13 @@ import { MSG } from "@/shared/messaging";
 import type {
   CandidateProfileSummary,
   GeminiSettings,
+  LlmProvider,
   RateBudgetConfig,
 } from "@/shared/types";
 import { sendMessage } from "../hooks/useBackgroundBridge";
 import {
   DEFAULT_FALLBACK_MODEL,
+  DEFAULT_OPENAI_MODEL,
   DEFAULT_PRIMARY_MODEL,
   DEFAULT_RPD,
   DEFAULT_RPM,
@@ -30,7 +32,7 @@ export function SettingsView() {
             className={tab === "gemini" ? "active" : "ghost"}
             onClick={() => setTab("gemini")}
           >
-            Gemini
+            LLM
           </button>
           <button
             className={tab === "budget" ? "active" : "ghost"}
@@ -57,9 +59,12 @@ export function SettingsView() {
 
 function GeminiSettingsForm() {
   const [s, setS] = useState<GeminiSettings>({
+    provider: "gemini",
     apiKey: "",
     primaryModel: DEFAULT_PRIMARY_MODEL,
     fallbackModel: DEFAULT_FALLBACK_MODEL,
+    openaiApiKey: "",
+    openaiModel: DEFAULT_OPENAI_MODEL,
     mockMode: false,
   });
   const [msg, setMsg] = useState<string | undefined>(undefined);
@@ -87,36 +92,93 @@ function GeminiSettingsForm() {
 
   return (
     <div className="card">
-      <h3>Gemini API</h3>
+      <h3>LLM Provider</h3>
       <label>
-        API key (free Google AI Studio)
-        <input
-          type="password"
-          value={s.apiKey}
-          onChange={(e) => setS({ ...s, apiKey: e.target.value })}
-          placeholder="AIza..."
-        />
+        Provider
+        <select
+          value={s.provider}
+          onChange={(e) =>
+            setS({ ...s, provider: e.target.value as LlmProvider })
+          }
+        >
+          <option value="gemini">Google Gemini</option>
+          <option value="openai">OpenAI</option>
+        </select>
       </label>
-      <div className="muted" style={{ marginTop: 4 }}>
-        Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>.
-        Stored only in chrome.storage.local on this device.
-      </div>
-      <div className="grid-2" style={{ marginTop: 8 }}>
-        <div>
-          <label>Primary model</label>
-          <input
-            value={s.primaryModel}
-            onChange={(e) => setS({ ...s, primaryModel: e.target.value })}
-          />
-        </div>
-        <div>
-          <label>Fallback model</label>
-          <input
-            value={s.fallbackModel}
-            onChange={(e) => setS({ ...s, fallbackModel: e.target.value })}
-          />
-        </div>
-      </div>
+
+      {s.provider === "gemini" && (
+        <>
+          <label style={{ marginTop: 8 }}>
+            Gemini API key (free Google AI Studio)
+            <input
+              type="password"
+              value={s.apiKey}
+              onChange={(e) => setS({ ...s, apiKey: e.target.value })}
+              placeholder="AIza..."
+            />
+          </label>
+          <div className="muted" style={{ marginTop: 4 }}>
+            Get a key at{" "}
+            <a
+              href="https://aistudio.google.com/apikey"
+              target="_blank"
+              rel="noreferrer"
+            >
+              aistudio.google.com/apikey
+            </a>
+            . Stored only in chrome.storage.local on this device.
+          </div>
+          <div className="grid-2" style={{ marginTop: 8 }}>
+            <div>
+              <label>Primary model</label>
+              <input
+                value={s.primaryModel}
+                onChange={(e) => setS({ ...s, primaryModel: e.target.value })}
+              />
+            </div>
+            <div>
+              <label>Fallback model</label>
+              <input
+                value={s.fallbackModel}
+                onChange={(e) => setS({ ...s, fallbackModel: e.target.value })}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {s.provider === "openai" && (
+        <>
+          <label style={{ marginTop: 8 }}>
+            OpenAI API key
+            <input
+              type="password"
+              value={s.openaiApiKey}
+              onChange={(e) => setS({ ...s, openaiApiKey: e.target.value })}
+              placeholder="sk-..."
+            />
+          </label>
+          <div className="muted" style={{ marginTop: 4 }}>
+            Get a key at{" "}
+            <a
+              href="https://platform.openai.com/api-keys"
+              target="_blank"
+              rel="noreferrer"
+            >
+              platform.openai.com/api-keys
+            </a>
+            . Stored only in chrome.storage.local on this device.
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <label>Model</label>
+            <input
+              value={s.openaiModel}
+              onChange={(e) => setS({ ...s, openaiModel: e.target.value })}
+            />
+          </div>
+        </>
+      )}
+
       <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
         <input
           type="checkbox"
@@ -127,8 +189,8 @@ function GeminiSettingsForm() {
         <span className="muted">Mock mode (no network calls; demo only)</span>
       </label>
       <div className="muted" style={{ marginTop: 8 }}>
-        Free-tier note: prompts sent via free API may be processed differently
-        than paid tier; avoid sharing sensitive PII.
+        API keys are stored only in chrome.storage.local on this device.
+        Avoid sharing sensitive PII in prompts.
       </div>
       <div className="row" style={{ marginTop: 8 }}>
         <button className="primary" onClick={save}>Save</button>

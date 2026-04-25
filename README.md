@@ -1,9 +1,12 @@
-# Opportunity Analyzer Agent — Gemini Free Tier Edition
+# Opportunity Analyzer Agent — Multi-LLM Edition
 
 A **local-first, rate-limit-aware Chrome MV3 extension** that analyzes the
 current webpage against a stored candidate profile, produces a grounded fit
-analysis, and drafts short application assets — all on top of the **free
-Google Gemini Developer API** (Google AI Studio).
+analysis, and drafts short application assets — powered by **Google Gemini**
+(free tier via Google AI Studio) **or OpenAI** (GPT-4o-mini and others).
+
+Users can choose their preferred LLM provider and enter their API key
+directly in the extension's Settings panel — no hardcoded keys.
 
 The architecture is deliberately designed around the free-tier's real-world
 pain points: bursty 429s, per-project quotas, and fluctuating limits.
@@ -29,9 +32,9 @@ The side panel has three tabs:
 2. **Tracker** — local database of all analyzed opportunities with editable
    statuses (`saved` / `review_needed` / `ready_to_apply` / `applied` /
    `archived`).
-3. **Settings** — Gemini API key, primary / fallback model, conservative RPM/
-   TPM/RPD, safety reserve %, max LLM calls per run, auto-minimal toggle, and
-   your local candidate profile summary.
+3. **Settings** — LLM provider selector (Gemini or OpenAI), API key entry,
+   model configuration, conservative RPM/TPM/RPD, safety reserve %, max LLM
+   calls per run, auto-minimal toggle, and your local candidate profile summary.
 
 ---
 
@@ -146,15 +149,20 @@ npm run typecheck
 
 ## Configuration
 
-Open the side panel → **Settings** → **Gemini**:
+Open the side panel → **Settings** → **LLM**:
 
-1. Paste your **Google AI Studio API key**
-   (get one at <https://aistudio.google.com/apikey>).
-   Stored only in `chrome.storage.local` on this device.
-2. Pick models:
-   - Primary: `gemini-2.5-flash-lite` (recommended for free-tier workloads)
-   - Fallback: `gemini-2.5-flash`
-3. (Optional) Enable **Mock mode** to run the entire flow without any
+1. **Choose a provider** from the dropdown:
+   - **Google Gemini** (default) — uses the free Google AI Studio API.
+   - **OpenAI** — uses the OpenAI chat completions API (requires a paid key).
+2. **Enter your API key** for the selected provider:
+   - Gemini: get one at <https://aistudio.google.com/apikey>
+   - OpenAI: get one at <https://platform.openai.com/api-keys>
+   - Keys are stored only in `chrome.storage.local` on this device.
+3. **Pick models**:
+   - Gemini primary: `gemini-2.5-flash-lite` (recommended for free-tier)
+   - Gemini fallback: `gemini-2.5-flash`
+   - OpenAI: `gpt-4o-mini` (default; change to `gpt-4o`, `gpt-3.5-turbo`, etc.)
+4. (Optional) Enable **Mock mode** to run the entire flow without any
    network calls — perfect for demos or when you've hit a quota.
 
 Then **Settings → Budget**:
@@ -229,7 +237,7 @@ Icons are not bundled. To add them:
 - **Content script on demand**: injected per run, short-lived, never scrapes
   in the background. Satisfies spec §4.1.
 - **Permissions principle**: `activeTab` + `scripting`; no broad host perms
-  outside `generativelanguage.googleapis.com`.
+  outside `generativelanguage.googleapis.com` and `api.openai.com`.
 
 The full design doc lives at `docs/ARCHITECTURE.md`.
 
@@ -245,7 +253,7 @@ The full design doc lives at `docs/ARCHITECTURE.md`.
 | Tool calls & results | `toolRegistry.ts` records every tool/LLM event with args + result previews |
 | At least 3 custom tools | 6 tools: `classifyCurrentPage`, `extractOpportunityFromPage`, `loadCandidateProfile`, `compareProfileToOpportunity`, `generateApplicationAssets`, `saveTrackerRecord` |
 | 429 handling + queueing | `budgetManager.onRateLimit` + `queueManager.ts` + `geminiAdapter.ts` |
-| Settings panel | `SettingsView.tsx` covers API key, models, budget, profile |
+| Settings panel | `SettingsView.tsx` covers provider choice, API keys, models, budget, profile |
 
 ---
 
@@ -253,7 +261,8 @@ The full design doc lives at `docs/ARCHITECTURE.md`.
 
 - **"Cannot inject on this page"**: internal pages (`chrome://`, Web Store,
   PDF viewer) are off-limits by design. Open a normal webpage.
-- **"Gemini API key is not set"**: open Settings → Gemini and paste your key.
+- **"Gemini API key is not set"** / **"OpenAI API key is not set"**: open
+  Settings → LLM, choose your provider, and paste your key.
 - **429 / RESOURCE_EXHAUSTED**: expected on free tier. The Budget Status card
   will show a backoff countdown; the agent waits and then retries with
   minimal mode. You can also tighten the RPM/RPD to avoid hitting it.
